@@ -197,4 +197,4 @@ def create_order(order: OrderCreate, db: Session = Depends(get_db)):
     db.add(new_order)
     db.commit()
     
-    return {"message": "¡Recolección solicitada con éxito!"}
+    return {"message": "¡Recolección solicitada con éxito okey!"}
