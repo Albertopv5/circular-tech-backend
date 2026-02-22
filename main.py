@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import sessionmaker, Session, declarative_base
 import bcrypt
+from sqlalchemy import Float
 
 # 1. CONFIGURACIÓN DE BASE DE DATOS (Reemplaza con tu URL de Neon)
 # Ejemplo: "postgresql://usuario:password@ep-host.region.aws.neon.tech/neondb?sslmode=require"
@@ -32,6 +33,25 @@ class UserDB(Base):
     password_hash = Column(String)
     role = Column(String) # 'Generador' o 'Centro'
 
+class CenterDB(Base):
+    __tablename__ = "centers"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    address = Column(String)
+    latitude = Column(Float)
+    longitude = Column(Float)
+    certifications = Column(String)
+
+class OrderDB(Base):
+    __tablename__ = "orders"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    center_id = Column(Integer)
+    user_lat = Column(Float)
+    user_lng = Column(Float)
+    status = Column(String, default="Pendiente")
+
 # Crea la tabla en la base de datos si no existe
 Base.metadata.create_all(bind=engine)
 
@@ -47,6 +67,22 @@ class UserResponse(BaseModel):
     name: str
     email: str
     role: str
+
+    class Config:
+        from_attributes = True
+
+class CenterResponse(BaseModel):
+    id: int
+    name: str
+    address: str
+    latitude: float
+    longitude: float
+    certifications: str
+
+class OrderCreate(BaseModel):
+    center_id: int
+    user_lat: float
+    user_lng: float
 
     class Config:
         from_attributes = True
@@ -122,3 +158,43 @@ def login_user(user: UserLogin, db: Session = Depends(get_db)):
             "email": db_user.email
         }
     }
+
+@app.get("/api/centers", response_model=list[CenterResponse])
+def get_centers(db: Session = Depends(get_db)):
+    centers = db.query(CenterDB).all()
+    
+    # Si aún no has guardado centros en tu base de datos Neon, enviamos estos de prueba
+    if not centers:
+        return [
+            {
+                "id": 1, 
+                "name": "RECITAB Centro de Reciclaje Parrilla", 
+                "address": "villa parrilla, villahermosa", 
+                "latitude": 17.8662, 
+                "longitude": -92.9244, 
+                "certifications": "R2v3, ISO 14001"
+            },
+            {
+                "id": 2, 
+                "name": "Reciclaje de la sierra", 
+                "address": "Carlos Pellicer Cámara 110, 1° de Mayo, Villahermosa", 
+                "latitude": 17.96844, 
+                "longitude": -92.9268, 
+                "certifications": "NOM-161-SEMARNAT"
+            }
+        ]
+        
+    return centers
+
+@app.post("/api/orders")
+def create_order(order: OrderCreate, db: Session = Depends(get_db)):
+    new_order = OrderDB(
+        center_id=order.center_id,
+        user_lat=order.user_lat,
+        user_lng=order.user_lng,
+        status="Pendiente"
+    )
+    db.add(new_order)
+    db.commit()
+    
+    return {"message": "¡Recolección solicitada con éxito!"}
