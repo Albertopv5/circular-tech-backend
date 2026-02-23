@@ -44,13 +44,14 @@ class CenterDB(Base):
     certifications = Column(String)
 
 class OrderDB(Base):
-    __tablename__ = "orders"
+    __tablename__ = "orders_v2" # <--- EL HACK: Forzamos a Neon a crear una tabla nueva
     
     id = Column(Integer, primary_key=True, index=True)
     center_id = Column(Integer)
     user_lat = Column(Float)
     user_lng = Column(Float)
     status = Column(String, default="Pendiente")
+    items = Column(String, default="") # <--- NUEVA COLUMNA para guardar la basura electrónica
 
 # Crea la tabla en la base de datos si no existe
 Base.metadata.create_all(bind=engine)
@@ -83,6 +84,7 @@ class OrderCreate(BaseModel):
     center_id: int
     user_lat: float
     user_lng: float
+    items: list[str] = []
 
     class Config:
         from_attributes = True
@@ -188,13 +190,16 @@ def get_centers(db: Session = Depends(get_db)):
 
 @app.post("/api/orders")
 def create_order(order: OrderCreate, db: Session = Depends(get_db)):
+    # Convertimos la lista de Flutter a un texto simple para la base de datos
+    items_str = ", ".join(order.items)
+    
     new_order = OrderDB(
         center_id=order.center_id,
         user_lat=order.user_lat,
         user_lng=order.user_lng,
-        status="Pendiente"
+        items=items_str # <--- Guardamos la basura electrónica aquí
     )
     db.add(new_order)
     db.commit()
-    
-    return {"message": "¡Recolección solicitada con éxito okey!"}
+    db.refresh(new_order)
+    return {"message": "Orden creada con éxito", "order_id": new_order.id, "items": new_order.items}
