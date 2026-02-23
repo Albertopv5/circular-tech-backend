@@ -209,3 +209,17 @@ def get_orders(db: Session = Depends(get_db)):
     # Traemos todas las órdenes ordenadas de la más reciente a la más antigua
     orders = db.query(OrderDB).order_by(OrderDB.id.desc()).all()
     return orders
+
+@app.put("/api/orders/{order_id}/complete")
+def complete_order(order_id: int, db: Session = Depends(get_db)):
+    # Buscamos la orden específica en la base de datos
+    order = db.query(OrderDB).filter(OrderDB.id == order_id).first()
+    
+    if not order:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+        
+    # Actualizamos el estado
+    order.status = "Completado"
+    db.commit()
+    
+    return {"message": "Orden marcada como Completada"}
