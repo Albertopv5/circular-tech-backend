@@ -203,3 +203,9 @@ def create_order(order: OrderCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_order)
     return {"message": "Orden creada con éxito", "order_id": new_order.id, "items": new_order.items}
+    
+@app.get("/api/orders")
+def get_orders(db: Session = Depends(get_db)):
+    # Traemos todas las órdenes ordenadas de la más reciente a la más antigua
+    orders = db.query(OrderDB).order_by(OrderDB.id.desc()).all()
+    return orders
