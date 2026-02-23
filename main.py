@@ -155,6 +155,7 @@ def login_user(user: UserLogin, db: Session = Depends(get_db)):
     return {
         "message": "Login exitoso", 
         "user": {
+            "id": db_user.id,
             "name": db_user.name, 
             "role": db_user.role,
             "email": db_user.email
@@ -208,6 +209,16 @@ def create_order(order: OrderCreate, db: Session = Depends(get_db)):
 def get_orders(db: Session = Depends(get_db)):
     # Traemos todas las órdenes ordenadas de la más reciente a la más antigua
     orders = db.query(OrderDB).order_by(OrderDB.id.desc()).all()
+    return orders
+
+@app.get("/api/orders/center/{center_id}")
+def get_center_orders(center_id: int, db: Session = Depends(get_db)):
+    # Filtramos por el ID del centro y que solo sean las "Pendientes"
+    orders = db.query(OrderDB).filter(
+        OrderDB.center_id == center_id,
+        OrderDB.status == "Pendiente"
+    ).order_by(OrderDB.id.desc()).all()
+    
     return orders
 
 @app.put("/api/orders/{order_id}/complete")
