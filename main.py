@@ -44,14 +44,22 @@ class CenterDB(Base):
     certifications = Column(String)
 
 class OrderDB(Base):
-    __tablename__ = "orders_v2" # <--- EL HACK: Forzamos a Neon a crear una tabla nueva
+    __tablename__ = "orders_v3" # <--- Forzamos la nueva tabla
     
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer)   # <--- EL NUEVO ESLABÓN: ¿Quién la pidió?
     center_id = Column(Integer)
     user_lat = Column(Float)
     user_lng = Column(Float)
     status = Column(String, default="Pendiente")
-    items = Column(String, default="") # <--- NUEVA COLUMNA para guardar la basura electrónica
+    items = Column(String, default="") 
+
+class OrderCreate(BaseModel):
+    user_id: int                # <--- Requerimos el ID del ciudadano
+    center_id: int
+    user_lat: float
+    user_lng: float
+    items: list[str] = []
 
 # Crea la tabla en la base de datos si no existe
 Base.metadata.create_all(bind=engine)
@@ -85,15 +93,6 @@ class CenterResponse(BaseModel):
     latitude: float
     longitude: float
     certifications: str
-
-class OrderCreate(BaseModel):
-    center_id: int
-    user_lat: float
-    user_lng: float
-    items: list[str] = []
-
-    class Config:
-        from_attributes = True
 
 # 4. SEGURIDAD (Encriptación directa con bcrypt)
 def get_password_hash(password: str) -> str:
@@ -219,19 +218,18 @@ def get_centers(db: Session = Depends(get_db)):
 
 @app.post("/api/orders")
 def create_order(order: OrderCreate, db: Session = Depends(get_db)):
-    # Convertimos la lista de Flutter a un texto simple para la base de datos
     items_str = ", ".join(order.items)
-    
     new_order = OrderDB(
+        user_id=order.user_id, # <--- Lo guardamos aquí
         center_id=order.center_id,
         user_lat=order.user_lat,
         user_lng=order.user_lng,
-        items=items_str # <--- Guardamos la basura electrónica aquí
+        items=items_str 
     )
     db.add(new_order)
     db.commit()
     db.refresh(new_order)
-    return {"message": "Orden creada con éxito", "order_id": new_order.id, "items": new_order.items}
+    return {"message": "Orden creada", "order_id": new_order.id}
     
 @app.get("/api/orders")
 def get_orders(db: Session = Depends(get_db)):
@@ -287,3 +285,11 @@ def update_user_profile(user_id: int, user_data: UserUpdate, db: Session = Depen
     db.commit()
     
     return {"message": "Perfil actualizado con éxito"}
+
+@app.get("/api/orders/user/{user_id}/completed")
+def get_user_completed_orders(user_id: int, db: Session = Depends(get_db)):
+    orders = db.query(OrderDB).filter(
+        OrderDB.user_id == user_id,
+        OrderDB.status == "Completado"
+    ).all()
+    return orders
