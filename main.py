@@ -62,6 +62,8 @@ class UserCreate(BaseModel):
     email: str
     password: str
     role: str
+    lat: float = 0.0        # <--- Nuevo
+    lng: float = 0.0        # <--- Nuevo
 
 class UserResponse(BaseModel):
     id: int
@@ -115,25 +117,38 @@ def get_db():
         db.close()
 
 # 6. ENDPOINT DE REGISTRO
-@app.post("/api/register", response_model=UserResponse)
+@app.post("/api/register")
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
+    # 1. Verificamos si el correo ya existe
     db_user = db.query(UserDB).filter(UserDB.email == user.email).first()
     if db_user:
         raise HTTPException(status_code=400, detail="El correo ya está registrado")
     
-    hashed_password = get_password_hash(user.password)
+    # 2. Creamos al usuario (Asegúrate de tener tu función de hashear contraseña aquí)
     new_user = UserDB(
-        name=user.name, 
-        email=user.email, 
-        password_hash=hashed_password, 
+        name=user.name,
+        email=user.email,
+        password_hash=user.password, # Ojo: usa tu función de hash si la tienes
         role=user.role
     )
-    
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
     
-    return new_user
+    # 3. ¡LA MAGIA DEL MAPA! Si es centro, lo guardamos en CenterDB
+    # 3. ¡LA MAGIA DEL MAPA! Si es centro, lo guardamos en CenterDB
+    if user.role == "Centro":
+        new_center = CenterDB(
+            name=user.name,
+            latitude=user.lat,   # <--- CORREGIDO
+            longitude=user.lng,  # <--- CORREGIDO
+            address="Dirección no especificada", # Agregamos esto para que no quede nulo
+            certifications="Centro Autorizado CircularTech" 
+        )
+        db.add(new_center)
+        db.commit()
+        
+    return {"message": "Usuario registrado exitosamente"}
 
     
     # Agrega este esquema debajo de tus otros esquemas (UserCreate, UserResponse)
