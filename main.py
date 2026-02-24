@@ -156,21 +156,30 @@ class UserLogin(BaseModel):
     email: str
     password: str
 
-# Agrega este endpoint al final de tu archivo main.py
 @app.post("/api/login")
 def login_user(user: UserLogin, db: Session = Depends(get_db)):
-    # 1. Buscamos al usuario por correo
+    # 1. Buscamos al usuario por correo en la tabla general
     db_user = db.query(UserDB).filter(UserDB.email == user.email).first()
     
     # 2. Verificamos que exista y que la contraseña coincida
     if not db_user or not verify_password(user.password, db_user.password_hash):
         raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos")
     
-    # 3. Si todo está bien, devolvemos sus datos básicos
+    # --- EL FIX DEL GAFETE (ID) ---
+    # Por defecto, asumimos que su ID es el de usuario normal
+    final_id = db_user.id
+    
+    # Pero si es un Centro, buscamos su ID real en la tabla de centros (usando su nombre)
+    if db_user.role == "Centro":
+        center_record = db.query(CenterDB).filter(CenterDB.name == db_user.name).first()
+        if center_record:
+            final_id = center_record.id # ¡Lo cambiamos por el ID del mapa!
+            
+    # 3. Si todo está bien, devolvemos sus datos con el ID corregido
     return {
         "message": "Login exitoso", 
         "user": {
-            "id": db_user.id,
+            "id": final_id, # <--- Ahora Flutter recibirá el ID correcto
             "name": db_user.name, 
             "role": db_user.role,
             "email": db_user.email
