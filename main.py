@@ -128,7 +128,7 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
     new_user = UserDB(
         name=user.name,
         email=user.email,
-        password_hash=user.password, # Ojo: usa tu función de hash si la tienes
+        password_hash=get_password_hash(user.password), # Ojo: usa tu función de hash si la tienes
         role=user.role
     )
     db.add(new_user)
