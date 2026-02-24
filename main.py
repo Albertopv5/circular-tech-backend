@@ -239,8 +239,7 @@ def get_orders(db: Session = Depends(get_db)):
 def get_center_orders(center_id: int, db: Session = Depends(get_db)):
     # Filtramos por el ID del centro y que solo sean las "Pendientes"
     orders = db.query(OrderDB).filter(
-        OrderDB.center_id == center_id,
-        OrderDB.status == "Pendiente"
+        OrderDB.center_id == center_id
     ).order_by(OrderDB.id.desc()).all()
     
     return orders
