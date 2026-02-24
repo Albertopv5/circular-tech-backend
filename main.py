@@ -65,6 +65,10 @@ class UserCreate(BaseModel):
     lat: float = 0.0        # <--- Nuevo
     lng: float = 0.0        # <--- Nuevo
 
+class UserUpdate(BaseModel):
+    name: str
+    email: str
+
 class UserResponse(BaseModel):
     id: int
     name: str
@@ -257,3 +261,29 @@ def complete_order(order_id: int, db: Session = Depends(get_db)):
     db.commit()
     
     return {"message": "Orden marcada como Completada"}
+
+@app.get("/api/users/{user_id}")
+def get_user_profile(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(UserDB).filter(UserDB.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return {"name": user.name, "email": user.email}
+
+@app.put("/api/users/{user_id}")
+def update_user_profile(user_id: int, user_data: UserUpdate, db: Session = Depends(get_db)):
+    user = db.query(UserDB).filter(UserDB.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+    # Si el usuario es un Centro, actualizamos también su nombre en el mapa
+    if user.role == "Centro":
+        center = db.query(CenterDB).filter(CenterDB.name == user.name).first()
+        if center:
+            center.name = user_data.name
+            
+    # Guardamos los nuevos datos
+    user.name = user_data.name
+    user.email = user_data.email
+    db.commit()
+    
+    return {"message": "Perfil actualizado con éxito"}
