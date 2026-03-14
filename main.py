@@ -237,6 +237,14 @@ def get_orders(db: Session = Depends(get_db)):
     orders = db.query(OrderDB).order_by(OrderDB.id.desc()).all()
     return orders
 
+@app.get("/api/orders/user/{user_id}")
+def get_user_orders(user_id: int, db: Session = Depends(get_db)):
+    # Solo las órdenes del usuario específico, de la más reciente a la más antigua
+    orders = db.query(OrderDB).filter(
+        OrderDB.user_id == user_id
+    ).order_by(OrderDB.id.desc()).all()
+    return orders
+
 @app.get("/api/orders/center/{center_id}")
 def get_center_orders(center_id: int, db: Session = Depends(get_db)):
     # Filtramos por el ID del centro y que solo sean las "Pendientes"
