@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker, Session, declarative_base
 import bcrypt
 from sqlalchemy import Float
 import httpx
+import uuid
 
 # 1. CONFIGURACIÓN DE BASE DE DATOS (Reemplaza con tu URL de Neon)
 DATABASE_URL = "postgresql://neondb_owner:npg_Lj1aJqiPS2rx@ep-tiny-queen-ai4ubol1-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
@@ -57,6 +58,7 @@ class OrderDB(Base):
     __tablename__ = "orders_v3"
     
     id = Column(Integer, primary_key=True, index=True)
+    folio = Column(String, unique=True, index=True)  # Folio único e impredecible
     user_id = Column(Integer)
     center_id = Column(Integer)
     collector_id = Column(Integer, nullable=True)  # NUEVO: Recolector asignado
@@ -90,6 +92,11 @@ def _add_column_if_not_exists(conn, table: str, column: str, col_type: str):
 with engine.connect() as conn:
     _add_column_if_not_exists(conn, "orders_v3", "collector_id", "INTEGER")
     _add_column_if_not_exists(conn, "orders_v3", "address", "VARCHAR DEFAULT ''")
+    _add_column_if_not_exists(conn, "orders_v3", "folio", "VARCHAR UNIQUE")
+
+def _generate_folio() -> str:
+    """Genera un folio único de 8 caracteres hexadecimales con prefijo CT."""
+    return f"CT-{uuid.uuid4().hex[:8].upper()}"
 
 # 3. ESQUEMAS DE PYDANTIC
 class UserCreate(BaseModel):
@@ -288,7 +295,10 @@ async def create_order(order: OrderCreate, db: Session = Depends(get_db)):
     # Geocodificación inversa: convertimos las coordenadas en dirección
     address = await reverse_geocode(order.user_lat, order.user_lng)
     
+    folio = _generate_folio()
+    
     new_order = OrderDB(
+        folio=folio,
         user_id=order.user_id,
         center_id=order.center_id,
         user_lat=order.user_lat,
@@ -299,7 +309,7 @@ async def create_order(order: OrderCreate, db: Session = Depends(get_db)):
     db.add(new_order)
     db.commit()
     db.refresh(new_order)
-    return {"message": "Orden creada", "order_id": new_order.id}
+    return {"message": "Orden creada", "order_id": new_order.id, "folio": new_order.folio}
     
 @app.get("/api/orders")
 def get_orders(db: Session = Depends(get_db)):
